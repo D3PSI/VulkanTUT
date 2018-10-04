@@ -18,6 +18,7 @@
 namespace vulk {
 
 	void init(void);
+	void printDeviceProperties(VkPhysicalDevice &device);
 
 }
 
@@ -34,6 +35,11 @@ VkInstance instance;
 */
 namespace vulk {
 
+	/*
+	*	Function:		void vulk::init()
+	*	Purpose:		Initializes the Vulkan API
+	*	
+	*/
 	void init() {
 
 		// Application info
@@ -89,6 +95,36 @@ namespace vulk {
 		ASSERT_VULKAN(result);
 
 		std::cout << amountOfPhysicalDevices << std::endl;
+		for (unsigned int i = 0; i < amountOfPhysicalDevices; i++) {
+
+			printDeviceProperties(physicalDevices[i]);
+
+		}
+
+	}
+
+	/*
+	*	Function:		vulk::printDeviceProperties(vkPhysicalDevice &device)
+	*	Purpose:		Prints the device information for every GPU
+	*	
+	*/
+	void printDeviceProperties(VkPhysicalDevice &device) {
+	
+		VkPhysicalDeviceProperties properties;
+		vkGetPhysicalDeviceProperties(device, &properties);
+
+		uint32_t apiVer = properties.apiVersion;
+
+		std::cout << "Name:	" << properties.deviceName << std::endl;
+		std::cout << "API-Version:	" << VK_VERSION_MAJOR(apiVer) << "." << VK_VERSION_MINOR(apiVer) << "." << VK_VERSION_PATCH(apiVer) << std::endl;
+		std::cout << "Driver-Version:	" << properties.driverVersion << std::endl;
+		std::cout << "Vendor-ID:	" << properties.vendorID << std::endl;
+		std::cout << "Device-ID:	" << properties.deviceID << std::endl;
+		std::cout << "Device-Type:	" << properties.deviceType << std::endl;
+		std::cout << "Pipeline-Cache-UUID:	" << properties.pipelineCacheUUID << std::endl;
+		//std::cout << "Limits:	" << properties.limits << std::endl;
+		//std::cout << "Sparse-Properties:	" << properties.sparseProperties << std::endl;
+		std::cout << "------------------" << std::endl;
 
 	}
 
