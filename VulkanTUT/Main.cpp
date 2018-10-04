@@ -65,8 +65,30 @@ namespace vulk {
 			&instance		// Pass the actual instance
 
 		);
-
 		ASSERT_VULKAN(result);
+
+		// Enumerate GPU's (physically)
+		uint32_t amountOfPhysicalDevices = 0;
+		result = vkEnumeratePhysicalDevices(
+
+			instance,						// Pass the instance
+			&amountOfPhysicalDevices,		// Pass the variable for the amount of GPU's
+			NULL							// Pass no array to store them, so we can just get the number of GPU's
+		
+		);
+		ASSERT_VULKAN(result);
+
+		VkPhysicalDevice *physicalDevices = new VkPhysicalDevice[amountOfPhysicalDevices];
+		result = vkEnumeratePhysicalDevices(
+			
+			instance,						// Pass the instance
+			&amountOfPhysicalDevices,		// Pass the amount of GPU's
+			physicalDevices					// Pass the array to store the enumerated GPU's
+		
+		);
+		ASSERT_VULKAN(result);
+
+		std::cout << amountOfPhysicalDevices << std::endl;
 
 	}
 
