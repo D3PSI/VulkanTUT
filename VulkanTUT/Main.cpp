@@ -7,6 +7,11 @@
 #include <iomanip>
 #include <intrin.h>
 
+/*
+*	Makro:			ASSERT_VULKAN(val)
+*	Purpose:		Checks for error codes and pauses code execution if necessary
+*	
+*/
 #define ASSERT_VULKAN(val)\
 	if(val != VK_SUCCESS) {\
 		__debugbreak();\
@@ -20,6 +25,8 @@ namespace vulk {
 
 	void init(void);
 	void printDeviceProperties(VkPhysicalDevice &device);
+	void printDeviceFeatures(VkPhysicalDevice &device);
+	void printDeviceMemoryProperties(VkPhysicalDevice &device);
 
 }
 
@@ -99,6 +106,8 @@ namespace vulk {
 		for (unsigned int i = 0; i < amountOfPhysicalDevices; i++) {
 
 			printDeviceProperties(physicalDevices[i]);
+			printDeviceFeatures(physicalDevices[i]);
+			printDeviceMemoryProperties(physicalDevices[i]);
 
 		}
 
@@ -199,6 +208,20 @@ namespace vulk {
 		std::cout << "Inherit Queries:	"							  << features.inheritedQueries							 << std::endl;
 		std::cout << "------------------"																					 << std::endl;
 		
+	}
+
+	/*
+	*	Function:		void printDeviceMemoryProperties(VkPhysicalDevice &device)
+	*	Purpose:		Prints the memory properties of the GPU
+	*	
+	*/
+	void printDeviceMemoryProperties(VkPhysicalDevice &device) {
+
+		VkPhysicalDeviceMemoryProperties memProp;
+		vkGetPhysicalDeviceMemoryProperties(device, &memProp);
+
+		std::cout << "Memory Type Count:	" << memProp.memoryTypeCount << std::endl;
+		std::cout << "Memory HEAP Count:	" << memProp.memoryHeapCount << std::endl;
 	}
 
 }
