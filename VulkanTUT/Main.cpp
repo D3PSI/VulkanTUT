@@ -27,6 +27,7 @@ namespace vulk {
 	void printDeviceProperties(VkPhysicalDevice &device);
 	void printDeviceFeatures(VkPhysicalDevice &device);
 	void printDeviceMemoryProperties(VkPhysicalDevice &device);
+	void printQueueFamilyProperties(VkPhysicalDevice &device);
 
 }
 
@@ -108,6 +109,7 @@ namespace vulk {
 			printDeviceProperties(physicalDevices[i]);
 			printDeviceFeatures(physicalDevices[i]);
 			printDeviceMemoryProperties(physicalDevices[i]);
+			printQueueFamilyProperties(physicalDevices[i]);
 
 		}
 
@@ -220,8 +222,54 @@ namespace vulk {
 		VkPhysicalDeviceMemoryProperties memProp;
 		vkGetPhysicalDeviceMemoryProperties(device, &memProp);
 
-		std::cout << "Memory Type Count:	" << memProp.memoryTypeCount << std::endl;
-		std::cout << "Memory HEAP Count:	" << memProp.memoryHeapCount << std::endl;
+		std::cout << "Memory Type Count:	"						  << memProp.memoryTypeCount							 << std::endl;
+		std::cout << "Memory HEAP Count:	"						  << memProp.memoryHeapCount							 << std::endl;
+	}
+
+	/*
+	*	Function:		void printQueueFamilyProperties(VkPhysicalDevice &device)
+	*	Purpose:		Prints the queue family properties
+	*	
+	*/
+	void printQueueFamilyProperties(VkPhysicalDevice &device) {
+	
+		uint32_t amountOfQueueFamilies = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(
+			
+			device,							// Pass the device / GPU
+			&amountOfQueueFamilies,			// Pass the variable to store amount of queue families
+			NULL							// Pass no array to store them, so we can just get the number of queue families
+		
+		);
+		VkQueueFamilyProperties *familyProperties = new VkQueueFamilyProperties[amountOfQueueFamilies];
+		vkGetPhysicalDeviceQueueFamilyProperties(
+
+			device,							// Pass the device / GPU
+			&amountOfQueueFamilies,			// Pass the variable to store amount of queue families
+			familyProperties				// Pass the array to store the enumerated queue families
+		);
+
+		std::cout << "Amount of Queue Families:	"					  << amountOfQueueFamilies								 << std::endl;
+
+		for (unsigned int i = 0; i < amountOfQueueFamilies; i++) {
+		
+			std::cout << "Queue Family Number:	"					  << i													 << std::endl;
+			std::cout << "VK_QUEUE_GRAPHICS_BIT:	"				  << ((familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)		<< std::endl;
+			std::cout << "VK_QUEUE_COMPUTE_BIT:	"					  << ((familyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0)			<< std::endl;
+			std::cout << "VK_QUEUE_TRANSFER_BIT:	"				  << ((familyProperties[i].queueFlags & VK_QUEUE_TRANSFER_BIT) != 0)		<< std::endl;
+			std::cout << "VK_QUEUE_SPARSE_BINDING_BIT:	"			  << ((familyProperties[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) != 0)	<< std::endl;
+			std::cout << "Queue Count:	"							  << familyProperties[i].queueCount											<< std::endl;
+			std::cout << "Timestamp Valid Bits:	"					  << familyProperties[i].timestampValidBits									<< std::endl;
+			
+			uint32_t width = familyProperties[i].minImageTransferGranularity.width;
+			uint32_t height = familyProperties[i].minImageTransferGranularity.height;
+			uint32_t depth = familyProperties[i].minImageTransferGranularity.depth;
+			std::cout << "Min Image Timestamp Granularity:	"		  << width << "," << height << "," << depth									<< std::endl;
+
+		}
+	
+		delete[] familyProperties;
+
 	}
 
 }
