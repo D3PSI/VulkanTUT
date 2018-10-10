@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iomanip>
 #include <intrin.h>
+#include <vector>
 
 /*
 *	Makro:			ASSERT_VULKAN(val)
@@ -24,10 +25,12 @@
 namespace vulk {
 
 	void init(void);
-	void printDeviceProperties(VkPhysicalDevice &device);
-	void printDeviceFeatures(VkPhysicalDevice &device);
-	void printDeviceMemoryProperties(VkPhysicalDevice &device);
-	void printQueueFamilyProperties(VkPhysicalDevice &device);
+	void deviceProperties(VkPhysicalDevice &device);
+	void deviceFeatures(VkPhysicalDevice &device);
+	void deviceMemoryProperties(VkPhysicalDevice &device);
+	void queueFamilyProperties(VkPhysicalDevice &device);
+	void deviceQueueCreateInfos(VkPhysicalDevice &device);
+	void deviceCreateInfo(VkPhysicalDevice &device);
 
 }
 
@@ -35,7 +38,10 @@ namespace vulk {
 *	Global Variables
 *
 */
+VkResult result; 
+VkPhysicalDevice *physicalDevices;
 VkInstance instance;
+VkDevice logicalDevice;
 
 /*
 *	Namespace:		vulk
@@ -61,19 +67,42 @@ namespace vulk {
 		appInfo.engineVersion					= VK_MAKE_VERSION(0, 0, 0);
 		appInfo.apiVersion						= VK_API_VERSION_1_1;
 
+
+		uint32_t amountOfLayers = 0;
+		vkEnumerateInstanceLayerProperties(&amountOfLayers, NULL);
+		VkLayerProperties *layers = new VkLayerProperties[amountOfLayers];
+		vkEnumerateInstanceLayerProperties(&amountOfLayers, layers);
+
+		std::cout << "Amount of instance layers:	" << amountOfLayers << std::endl;
+		for (unsigned int i = 0; i < amountOfLayers; i++) {
+		
+			std::cout << "Name:	"				<< layers[i].layerName					<< std::endl;
+			std::cout << "Spec-Version:	"		<< layers[i].specVersion				<< std::endl;
+			std::cout << "Impl-Version:	"		<< layers[i].implementationVersion		<< std::endl;
+			std::cout << "Description:	"		<< layers[i].description				<< std::endl;
+			std::cout << "------------------"	<< std::endl;
+
+		}
+
+		const std::vector<const char*> validationLayers = {
+			
+			"VK_LAYER_LUNARG_standard_validation"
+		
+		};
+
 		// Instance info
 		VkInstanceCreateInfo instanceInfo;
 		instanceInfo.sType						= VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		instanceInfo.pNext						= NULL;
 		instanceInfo.flags						= 0;
 		instanceInfo.pApplicationInfo			= &appInfo;
-		instanceInfo.enabledLayerCount			= 0;
-		instanceInfo.ppEnabledLayerNames		= nullptr;
+		instanceInfo.enabledLayerCount			= validationLayers.size();
+		instanceInfo.ppEnabledLayerNames		= validationLayers.data();
 		instanceInfo.enabledExtensionCount		= 0;
 		instanceInfo.ppEnabledExtensionNames	= nullptr;
 
 		// Instance creation
-		VkResult result = vkCreateInstance(
+		result = vkCreateInstance(
 
 			&instanceInfo,	// Pass instance info
 			NULL,			// Pass no allocation callback
@@ -93,7 +122,7 @@ namespace vulk {
 		);
 		ASSERT_VULKAN(result);
 
-		VkPhysicalDevice *physicalDevices = new VkPhysicalDevice[amountOfPhysicalDevices];
+		physicalDevices = new VkPhysicalDevice[amountOfPhysicalDevices];
 		result = vkEnumeratePhysicalDevices(
 			
 			instance,						// Pass the instance
@@ -106,10 +135,12 @@ namespace vulk {
 		std::cout << "Number of GPU's:	" << amountOfPhysicalDevices << std::endl;
 		for (unsigned int i = 0; i < amountOfPhysicalDevices; i++) {
 
-			printDeviceProperties(physicalDevices[i]);
-			printDeviceFeatures(physicalDevices[i]);
-			printDeviceMemoryProperties(physicalDevices[i]);
-			printQueueFamilyProperties(physicalDevices[i]);
+			deviceProperties(physicalDevices[i]);
+			deviceFeatures(physicalDevices[i]);
+			deviceMemoryProperties(physicalDevices[i]);
+			queueFamilyProperties(physicalDevices[i]); 
+			deviceQueueCreateInfos(physicalDevices[i]);
+			deviceCreateInfo(physicalDevices[i]);
 
 		}
 
@@ -120,7 +151,7 @@ namespace vulk {
 	*	Purpose:		Prints the device information for every GPU
 	*	
 	*/
-	void printDeviceProperties(VkPhysicalDevice &device) {
+	void deviceProperties(VkPhysicalDevice &device) {
 	
 		// Device properties
 		VkPhysicalDeviceProperties properties;
@@ -132,6 +163,7 @@ namespace vulk {
 		std::cout << "API-Version:	" << VK_VERSION_MAJOR(apiVer) << 
 			"." << VK_VERSION_MINOR(apiVer) << "." <<
 			VK_VERSION_PATCH(apiVer)																						 << std::endl;
+		std::cout << "Discrete-Queue-Priorities:	"				  << properties.limits.discreteQueuePriorities			 << std::endl;
 		std::cout << "Driver-Version:	"							  << properties.driverVersion							 << std::endl;
 		std::cout << "Vendor-ID:	"								  << properties.vendorID								 << std::endl;
 		std::cout << "Device-ID:	"								  << properties.deviceID								 << std::endl;
@@ -146,7 +178,7 @@ namespace vulk {
 	*	Purpose:		Prints detailed information about the GPU
 	*	
 	*/
-	void printDeviceFeatures(VkPhysicalDevice &device) {
+	void deviceFeatures(VkPhysicalDevice &device) {
 	
 		// Device features
 		VkPhysicalDeviceFeatures features;
@@ -217,8 +249,9 @@ namespace vulk {
 	*	Purpose:		Prints the memory properties of the GPU
 	*	
 	*/
-	void printDeviceMemoryProperties(VkPhysicalDevice &device) {
+	void deviceMemoryProperties(VkPhysicalDevice &device) {
 
+		// Device memory properties
 		VkPhysicalDeviceMemoryProperties memProp;
 		vkGetPhysicalDeviceMemoryProperties(device, &memProp);
 
@@ -231,8 +264,9 @@ namespace vulk {
 	*	Purpose:		Prints the queue family properties
 	*	
 	*/
-	void printQueueFamilyProperties(VkPhysicalDevice &device) {
+	void queueFamilyProperties(VkPhysicalDevice &device) {
 	
+		// Queue family properties
 		uint32_t amountOfQueueFamilies = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(
 			
@@ -270,6 +304,62 @@ namespace vulk {
 	
 		delete[] familyProperties;
 
+	}
+
+	/*
+	*	Function:		void printDeviceQueueCreateInfo(VkPhysicalDevice &device)
+	*	Purpose:		Gather information to create logical device
+	*	
+	*/
+	// Device queue create info
+	VkDeviceQueueCreateInfo deviceQueueCreateInfo;
+	float queuePriorities[] = {1.0f, 1.0f, 1.0f, 1.0f};
+	void deviceQueueCreateInfos(VkPhysicalDevice &device) {
+	
+		deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		deviceQueueCreateInfo.pNext = NULL;
+		deviceQueueCreateInfo.flags = 0;
+		deviceQueueCreateInfo.queueFamilyIndex = 0;		// TODO: Enumerate best queue family and choose the correct index
+		deviceQueueCreateInfo.queueCount = 4;			// TODO: Check if amount is valid
+		deviceQueueCreateInfo.pQueuePriorities = queuePriorities;
+	
+	}
+
+	/*
+	*	Function:		void printDeviceCreateInfo(VkPhysicalDevice &device)
+	*	Purpose:		Prints the device creation info
+	*	
+	*/
+	// Physical device features
+	VkPhysicalDeviceFeatures usedFeatures = {};
+	// Device create info
+	VkDeviceCreateInfo createInfo;
+	void deviceCreateInfo(VkPhysicalDevice &device) {
+	
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		createInfo.pNext = NULL;
+		createInfo.flags = 0;
+		createInfo.queueCreateInfoCount = 1;
+		createInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
+		createInfo.enabledLayerCount = 0;
+		createInfo.ppEnabledLayerNames = NULL;
+		createInfo.enabledExtensionCount = 0;
+		createInfo.ppEnabledExtensionNames = NULL;
+		createInfo.pEnabledFeatures = &usedFeatures;
+	
+	}
+
+	/*
+	*	Function:		void device()
+	*	Purpose:		Creates the logical device from the physical device
+	*
+	*/
+	void device() {
+
+		// TODO: Pick best device instead of first device
+		result = vkCreateDevice(physicalDevices[0], &createInfo, NULL, &logicalDevice);
+		ASSERT_VULKAN(result);
+	
 	}
 
 }
