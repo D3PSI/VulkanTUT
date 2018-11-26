@@ -2,11 +2,13 @@
 *	Main.cpp: Defines the entry point for the console application.
 *
 */
+#define VK_USE_PLATFORM_WIN32_KHR
+#include "Logger.hpp"
 #include "vulkan/vulkan.h"
 #include <iostream>
-#include <iomanip>
 #include <intrin.h>
 #include <vector>
+#include <thread>
 
 /*
 *	Makro:			ASSERT_VULKAN(val)
@@ -14,8 +16,11 @@
 *	
 */
 #define ASSERT_VULKAN(val)\
+	\
 	if(val != VK_SUCCESS) {\
+	\
 		__debugbreak();\
+	\
 	}
 
 /*
@@ -30,7 +35,11 @@ namespace vulk {
 	void deviceMemoryProperties(VkPhysicalDevice &device);
 	void queueFamilyProperties(VkPhysicalDevice &device);
 	void deviceQueueCreateInfos(VkPhysicalDevice &device);
-	void deviceCreateInfo(VkPhysicalDevice &device);
+	void deviceCreateInfo(VkPhysicalDevice &device); 
+	void device(void);
+	void createQueue(void);
+	void createSurface(void);
+	void tidyUp(void);
 
 }
 
@@ -38,10 +47,7 @@ namespace vulk {
 *	Global Variables
 *
 */
-VkResult result; 
-VkPhysicalDevice *physicalDevices;
-VkInstance instance;
-VkDevice logicalDevice;
+VkResult result;
 
 /*
 *	Namespace:		vulk
@@ -49,6 +55,16 @@ VkDevice logicalDevice;
 *
 */
 namespace vulk {
+	/*
+	*	Global Variables in namespace
+	*
+	*/
+	Logger logger;
+	VkPhysicalDevice *physicalDevices;
+	VkLayerProperties *layers;
+	VkExtensionProperties *extensions;
+	VkInstance instance;
+	VkDevice logicalDevice;
 
 	/*
 	*	Function:		void vulk::init()
@@ -56,6 +72,9 @@ namespace vulk {
 	*	
 	*/
 	void init() {
+
+		logger.start();
+		logger.log(START_STOP_LOG, "Startup initialized...");
 
 		// Application info
 		VkApplicationInfo appInfo;
@@ -67,10 +86,11 @@ namespace vulk {
 		appInfo.engineVersion					= VK_MAKE_VERSION(0, 0, 0);
 		appInfo.apiVersion						= VK_API_VERSION_1_1;
 
+		logger.log(EVENT_LOG, "VkApplicationInfo gathered");
 
 		uint32_t amountOfLayers = 0;
 		vkEnumerateInstanceLayerProperties(&amountOfLayers, NULL);
-		VkLayerProperties *layers = new VkLayerProperties[amountOfLayers];
+		layers = new VkLayerProperties[amountOfLayers];
 		vkEnumerateInstanceLayerProperties(&amountOfLayers, layers);
 
 		std::cout << "Amount of instance layers:	" << amountOfLayers << std::endl;
@@ -84,10 +104,43 @@ namespace vulk {
 
 		}
 
+		uint32_t amountOfExtensions = 0;
+		vkEnumerateInstanceExtensionProperties(
+			
+			NULL, 
+			&amountOfExtensions, 
+			NULL
+		
+		);
+		extensions = new VkExtensionProperties[amountOfExtensions];
+		vkEnumerateInstanceExtensionProperties(
+			
+			NULL, 
+			&amountOfExtensions, 
+			extensions
+		
+		);
+
+		std::cout << "Amount of extensions:	" << amountOfExtensions << std::endl;
+		for (unsigned int i = 0; i < amountOfExtensions; i++) {
+		
+			std::cout << "Name:	"				<< extensions[i].extensionName			<< std::endl;
+			std::cout << "Spec-Version:	"		<< extensions[i].specVersion			<< std::endl;
+			std::cout << "------------------"	<< std::endl;
+		
+		}
+
 		const std::vector<const char*> validationLayers = {
 			
 			"VK_LAYER_LUNARG_standard_validation"
 		
+		};
+
+		const std::vector<const char*> usedExtensions = {
+		
+			"VK_KHR_surface",
+			VK_KHR_SURFACE_EXTENSION_NAME
+
 		};
 
 		// Instance info
@@ -98,9 +151,11 @@ namespace vulk {
 		instanceInfo.pApplicationInfo			= &appInfo;
 		instanceInfo.enabledLayerCount			= validationLayers.size();
 		instanceInfo.ppEnabledLayerNames		= validationLayers.data();
-		instanceInfo.enabledExtensionCount		= 0;
-		instanceInfo.ppEnabledExtensionNames	= nullptr;
-
+		instanceInfo.enabledExtensionCount		= usedExtensions.size();
+		instanceInfo.ppEnabledExtensionNames	= usedExtensions.data();
+		
+		logger.log(EVENT_LOG, "VkInstanceCreateInfo gathered");
+		
 		// Instance creation
 		result = vkCreateInstance(
 
@@ -109,7 +164,9 @@ namespace vulk {
 			&instance		// Pass the actual instance
 
 		);
-		ASSERT_VULKAN(result);
+		ASSERT_VULKAN(result);		
+		
+		logger.log(EVENT_LOG, "Instance created successfully");
 
 		// Enumerate GPU's (physically)
 		uint32_t amountOfPhysicalDevices = 0;
@@ -147,7 +204,7 @@ namespace vulk {
 	}
 
 	/*
-	*	Function:		vulk::printDeviceProperties(vkPhysicalDevice &device)
+	*	Function:		vulk::deviceProperties(vkPhysicalDevice &device)
 	*	Purpose:		Prints the device information for every GPU
 	*	
 	*/
@@ -174,7 +231,7 @@ namespace vulk {
 	}
 
 	/*
-	*	Function:		void printDeviceFeatures(VkPhysicalDevice &device)
+	*	Function:		void deviceFeatures(VkPhysicalDevice &device)
 	*	Purpose:		Prints detailed information about the GPU
 	*	
 	*/
@@ -245,7 +302,7 @@ namespace vulk {
 	}
 
 	/*
-	*	Function:		void printDeviceMemoryProperties(VkPhysicalDevice &device)
+	*	Function:		void deviceMemoryProperties(VkPhysicalDevice &device)
 	*	Purpose:		Prints the memory properties of the GPU
 	*	
 	*/
@@ -257,10 +314,11 @@ namespace vulk {
 
 		std::cout << "Memory Type Count:	"						  << memProp.memoryTypeCount							 << std::endl;
 		std::cout << "Memory HEAP Count:	"						  << memProp.memoryHeapCount							 << std::endl;
+
 	}
 
 	/*
-	*	Function:		void printQueueFamilyProperties(VkPhysicalDevice &device)
+	*	Function:		void qeueFamilyProperties(VkPhysicalDevice &device)
 	*	Purpose:		Prints the queue family properties
 	*	
 	*/
@@ -307,7 +365,7 @@ namespace vulk {
 	}
 
 	/*
-	*	Function:		void printDeviceQueueCreateInfo(VkPhysicalDevice &device)
+	*	Function:		void deviceQueueCreateInfo(VkPhysicalDevice &device)
 	*	Purpose:		Gather information to create logical device
 	*	
 	*/
@@ -320,13 +378,13 @@ namespace vulk {
 		deviceQueueCreateInfo.pNext = NULL;
 		deviceQueueCreateInfo.flags = 0;
 		deviceQueueCreateInfo.queueFamilyIndex = 0;		// TODO: Enumerate best queue family and choose the correct index
-		deviceQueueCreateInfo.queueCount = 4;			// TODO: Check if amount is valid
+		deviceQueueCreateInfo.queueCount = 1;			// TODO: Check if amount is valid
 		deviceQueueCreateInfo.pQueuePriorities = queuePriorities;
 	
 	}
 
 	/*
-	*	Function:		void printDeviceCreateInfo(VkPhysicalDevice &device)
+	*	Function:		void deviceCreateInfo(VkPhysicalDevice &device)
 	*	Purpose:		Prints the device creation info
 	*	
 	*/
@@ -359,7 +417,75 @@ namespace vulk {
 		// TODO: Pick best device instead of first device
 		result = vkCreateDevice(physicalDevices[0], &createInfo, NULL, &logicalDevice);
 		ASSERT_VULKAN(result);
+
+		logger.log(EVENT_LOG, "Device created successfully");
+
+		createQueue();
+
+		tidyUp();
+		logger.log(EVENT_LOG, "Cleaned up successfully");
 	
+	}
+
+	/*
+	*	Function:		void createQueue()
+	*	Purpose:		Creates the queue for the logical device
+	*
+	*/
+	// Queue
+	VkQueue queue;
+	void createQueue() {
+	
+		vkGetDeviceQueue(logicalDevice, 0, 0, &queue);
+	
+	}
+
+	/*
+	*	Function:		
+	*	Purpose:		
+	*
+	*/
+	// Surface create info
+	VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
+	// Surface
+	VkSurfaceKHR surface;
+	void createSurface() {
+	
+		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
+		surfaceCreateInfo.pNext = NULL;
+		surfaceCreateInfo.flags = 0;
+		surfaceCreateInfo.hinstance = NULL;
+		surfaceCreateInfo.hwnd = NULL;
+
+		result = vkCreateWin32SurfaceKHR(
+
+			instance,
+			&surfaceCreateInfo,
+			NULL,
+			&surface
+
+		);
+		ASSERT_VULKAN(result);
+
+		logger.log(EVENT_LOG, "Surface created successfully");
+	
+	}
+
+	/*
+	*	Function:		void tidyUp()
+	*	Purpose:		Cleans the code, deletes unneeded objects and memory
+	*
+	*/
+	void tidyUp() {
+	
+		vkDeviceWaitIdle(logicalDevice);
+		vkDestroyDevice(logicalDevice, NULL);
+		vkDestroySurfaceKHR(instance, surface, NULL);
+		vkDestroyInstance(instance, NULL);
+		delete[] layers;
+		delete[] extensions;
+		delete[] physicalDevices;
+
 	}
 
 }
@@ -372,7 +498,7 @@ namespace vulk {
 int main() {
 
 	vulk::init();
-
+	vulk::logger.log(START_STOP_LOG, "Shutdown initialized...");
 	return 0;
 
 }
