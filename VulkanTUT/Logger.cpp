@@ -41,7 +41,7 @@ void Logger::log(int logNr, std::string text) {
 	std::ofstream stream;
 
 	switch (logNr) {
-	case 0:
+	case EVENT_LOG:
 		if (countEvent == 0) {
 
 			stream.open(directory + eventLogStreamFileName, std::ios::trunc);
@@ -54,7 +54,7 @@ void Logger::log(int logNr, std::string text) {
 		
 		}
 		break;
-	case 1:
+	case ERROR_LOG:
 		if (countError == 0) {
 
 			stream.open(directory + errorLogStreamFileName, std::ios::trunc);
@@ -67,7 +67,7 @@ void Logger::log(int logNr, std::string text) {
 		
 		}
 		break;
-	case 2:
+	case START_STOP_LOG:
 		stream.open(directory + startStopStreamFileName, std::ios::app);
 		break;
 	default:
