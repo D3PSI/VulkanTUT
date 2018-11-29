@@ -90,13 +90,13 @@ namespace game {
 		*	Global Variables in namespace
 		*
 		*/
-		Logger logger;
-		VkPhysicalDevice* physicalDevices;
-		VkLayerProperties* layers;
-		VkExtensionProperties* extensions;
-		VkInstance instance;
-		VkDevice logicalDevice;
-		VkSurfaceKHR surface;
+		Logger						logger;
+		VkPhysicalDevice*			physicalDevices;
+		VkLayerProperties*			layers;
+		VkExtensionProperties*		extensions;
+		VkInstance					instance;
+		VkDevice					logicalDevice;
+		VkSurfaceKHR				surface;
 
 		/*
 		*	Function:		void vulkan::init()
@@ -156,9 +156,9 @@ namespace game {
 			std::cout << "Amount of extensions:	" << amountOfExtensions << std::endl;
 			for (unsigned int i = 0; i < amountOfExtensions; i++) {
 
-				std::cout << "Name:	" << extensions[i].extensionName << std::endl;
-				std::cout << "Spec-Version:	" << extensions[i].specVersion << std::endl;
-				std::cout << "------------------" << std::endl;
+				std::cout << "Name:	"				<< extensions[i].extensionName		<< std::endl;
+				std::cout << "Spec-Version:	"		<< extensions[i].specVersion		<< std::endl;
+				std::cout << "------------------"	<< std::endl;
 
 			}
 
@@ -169,7 +169,7 @@ namespace game {
 			};
 
 			uint32_t amountOfGlfwExtensions = 0;
-			auto glfwExtensions = glfwGetRequiredInstanceExtensions(&amountOfGlfwExtensions);
+			const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&amountOfGlfwExtensions);
 
 			/*const std::vector< const char* > usedExtensions = {
 
@@ -180,14 +180,14 @@ namespace game {
 
 			// Instance info
 			VkInstanceCreateInfo instanceInfo;
-			instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-			instanceInfo.pNext = NULL;
-			instanceInfo.flags = 0;
-			instanceInfo.pApplicationInfo = &appInfo;
-			instanceInfo.enabledLayerCount = validationLayers.size();
-			instanceInfo.ppEnabledLayerNames = validationLayers.data();
-			instanceInfo.enabledExtensionCount = amountOfGlfwExtensions;
-			instanceInfo.ppEnabledExtensionNames = glfwExtensions;
+			instanceInfo.sType							= VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+			instanceInfo.pNext							= NULL;
+			instanceInfo.flags							= 0;
+			instanceInfo.pApplicationInfo				= &appInfo;
+			instanceInfo.enabledLayerCount				= validationLayers.size();
+			instanceInfo.ppEnabledLayerNames			= validationLayers.data();
+			instanceInfo.enabledExtensionCount			= amountOfGlfwExtensions;
+			instanceInfo.ppEnabledExtensionNames		= glfwExtensions;
 
 			logger.log(EVENT_LOG, "VkInstanceCreateInfo gathered");
 
@@ -420,12 +420,12 @@ namespace game {
 		float queuePriorities[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 		void deviceQueueCreateInfos(VkPhysicalDevice &device) {
 
-			deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-			deviceQueueCreateInfo.pNext = NULL;
-			deviceQueueCreateInfo.flags = 0;
-			deviceQueueCreateInfo.queueFamilyIndex = 0;		// TODO: Enumerate best queue family and choose the correct index
-			deviceQueueCreateInfo.queueCount = 1;			// TODO: Check if amount is valid
-			deviceQueueCreateInfo.pQueuePriorities = queuePriorities;
+			deviceQueueCreateInfo.sType					= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+			deviceQueueCreateInfo.pNext					= NULL;
+			deviceQueueCreateInfo.flags					= 0;
+			deviceQueueCreateInfo.queueFamilyIndex		= 0;		// TODO: Enumerate best queue family and choose the correct index
+			deviceQueueCreateInfo.queueCount			= 1;		// TODO: Check if amount is valid
+			deviceQueueCreateInfo.pQueuePriorities		= queuePriorities;
 
 		}
 
@@ -440,16 +440,16 @@ namespace game {
 		VkDeviceCreateInfo createInfo;
 		void deviceCreateInfo(VkPhysicalDevice &device) {
 
-			createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-			createInfo.pNext = NULL;
-			createInfo.flags = 0;
-			createInfo.queueCreateInfoCount = 1;
-			createInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
-			createInfo.enabledLayerCount = 0;
-			createInfo.ppEnabledLayerNames = NULL;
-			createInfo.enabledExtensionCount = 0;
-			createInfo.ppEnabledExtensionNames = NULL;
-			createInfo.pEnabledFeatures = &usedFeatures;
+			createInfo.sType						= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+			createInfo.pNext						= NULL;
+			createInfo.flags						= 0;
+			createInfo.queueCreateInfoCount			= 1;
+			createInfo.pQueueCreateInfos			= &deviceQueueCreateInfo;
+			createInfo.enabledLayerCount			= 0;
+			createInfo.ppEnabledLayerNames			= NULL;
+			createInfo.enabledExtensionCount		= 0;
+			createInfo.ppEnabledExtensionNames		= NULL;
+			createInfo.pEnabledFeatures				= &usedFeatures;
 
 		}
 
@@ -489,7 +489,14 @@ namespace game {
 		VkQueue queue;
 		void createQueue() {
 
-			vkGetDeviceQueue(logicalDevice, 0, 0, &queue);
+			vkGetDeviceQueue(
+				
+				logicalDevice, 
+				0, 
+				0, 
+				&queue
+			
+			);
 
 		}
 
@@ -503,11 +510,11 @@ namespace game {
 		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
 		void createSurface() {
 
-			surfaceCreateInfo.sType		= VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
-			surfaceCreateInfo.pNext		= NULL;
-			surfaceCreateInfo.flags		= 0;
-			surfaceCreateInfo.hinstance = NULL;
-			surfaceCreateInfo.hwnd		= NULL;
+			surfaceCreateInfo.sType			= VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
+			surfaceCreateInfo.pNext			= NULL;
+			surfaceCreateInfo.flags			= 0;
+			surfaceCreateInfo.hinstance		= NULL;
+			surfaceCreateInfo.hwnd			= NULL;
 
 			result = vkCreateWin32SurfaceKHR(
 
@@ -530,7 +537,7 @@ namespace game {
 		*/
 		void tidyUp() {
 
-			vkDeviceWaitIdle(logicalDevice);
+			vkDeviceWaitIdle(logicalDevice); 
 			vkDestroyDevice(logicalDevice, NULL);
 			vkDestroySurfaceKHR(
 				
@@ -566,7 +573,15 @@ namespace game {
 			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 			glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-			window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, TITLE, nullptr, nullptr);
+			window = glfwCreateWindow(
+				
+				WINDOW_WIDTH,
+				WINDOW_HEIGHT, 
+				TITLE, 
+				nullptr, 
+				nullptr
+			
+			);
 
 		}
 
@@ -604,7 +619,7 @@ namespace game {
 		void shutdownVulkan() {
 
 			vulkan::logger.log(START_STOP_LOG, "Shutdown initialized...");
-			vulkan::tidyUp();
+			//vulkan::tidyUp();
 
 		}
 
