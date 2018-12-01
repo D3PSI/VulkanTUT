@@ -89,14 +89,36 @@ void Logger::log(int logNr, std::string text) {
 	int Min		= local_time.tm_min;
 	int Sec		= local_time.tm_sec;
 
+	if (logNr == ERROR_LOG) {
 
-	stream << Day << ":" 
-		<< Month << ":" 
-		<< Year << "   " 
-		<< Hour << ":" 
-		<< Min << ":" 
-		<< Sec << "		===		" 
-		<< text << std::endl;
+		stream << Day << ":"
+			<< Month << ":"
+			<< Year << "   "
+			<< Hour << ":"
+			<< Min << ":"
+			<< Sec << "		===		"
+			<< text << std::endl;
+
+		std::cerr << Day << ":"
+			<< Month << ":"
+			<< Year << "   "
+			<< Hour << ":"
+			<< Min << ":"
+			<< Sec << "		===		"
+			<< text << std::endl;
+
+	}
+	else {
+	
+		stream << Day << ":"
+			<< Month << ":"
+			<< Year << "   "
+			<< Hour << ":"
+			<< Min << ":"
+			<< Sec << "		===		"
+			<< text << std::endl;
+	
+	}
 	stream.close();
 
 }

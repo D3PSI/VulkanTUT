@@ -70,17 +70,19 @@ namespace game {
 	*	Global Variables
 	*
 	*/
-	VkResult									result;
+	VkResult										result;
 
-	GLFWwindow*									window;
+	GLFWwindow*										window;
 
-	VkInstance									instance;
-	VkDevice									logicalDevice;
-	VkSurfaceKHR								surface;
+	VkInstance										instance;
+	VkDevice										logicalDevice;
+	VkSurfaceKHR									surface;
+	VkSwapchainKHR									swapchain;
+	VkImageView*									imageViews;
 
-	const unsigned int WINDOW_WIDTH				= 1280;
-	const unsigned int WINDOW_HEIGHT			= 780;
-	const char* TITLE							= "D3PSI's first VULKAN engine";
+	const unsigned int WINDOW_WIDTH					= 1280;
+	const unsigned int WINDOW_HEIGHT				= 780;
+	const char* TITLE								= "D3PSI's first VULKAN engine";
 
 
 	/*
@@ -94,10 +96,12 @@ namespace game {
 		*	Global Variables in namespace
 		*
 		*/
-		Logger						logger;
-		VkPhysicalDevice*			physicalDevices;
-		VkLayerProperties*			layers;
-		VkExtensionProperties*		extensions;
+		Logger										logger;
+		VkPhysicalDevice*							physicalDevices;
+		VkLayerProperties*							layers;
+		VkExtensionProperties*						extensions;
+
+		uint32_t amountOfImagesInSwapchain			= 0;
 
 		/*
 		*	Function:		void vulkan::init()
@@ -531,6 +535,13 @@ namespace game {
 			);
 			ASSERT_VULKAN(result);
 
+			if (!surfaceSupport) {
+			
+				logger.log(ERROR_LOG, "Surface not supported!");
+				__debugbreak();
+
+			}
+
 		}
 
 		
@@ -664,8 +675,6 @@ namespace game {
 		*/
 		// SwapchainCreateInfo
 		VkSwapchainCreateInfoKHR swapchainCreateInfo;
-		// Swapchain
-		VkSwapchainKHR swapchain;
 		void swapchainCreate() {
 		
 			swapchainCreateInfo.sType						= VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -688,10 +697,75 @@ namespace game {
 			swapchainCreateInfo.pQueueFamilyIndices			= nullptr;
 			swapchainCreateInfo.preTransform				= VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 			swapchainCreateInfo.compositeAlpha				= VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-			swapchainCreateInfo.presentMode					= VK_PRESENT_MODE_FIFO_KHR;			// TODO: Check if valid, VK_PRESENT_MODE_MAILBOX_KHR?
+			swapchainCreateInfo.presentMode					= VK_PRESENT_MODE_FIFO_KHR;				// TODO: Check if valid, VK_PRESENT_MODE_MAILBOX_KHR?
 			swapchainCreateInfo.clipped						= VK_TRUE;
 			swapchainCreateInfo.oldSwapchain				= VK_NULL_HANDLE;
 		
+			result = vkCreateSwapchainKHR(
+			
+				logicalDevice,
+				&swapchainCreateInfo,
+				nullptr,
+				&swapchain
+			
+			);
+			ASSERT_VULKAN(result);
+
+			vkGetSwapchainImagesKHR(
+			
+				logicalDevice,
+				swapchain,
+				&amountOfImagesInSwapchain,
+				nullptr
+			
+			);
+			VkImage* swapchainImages = new VkImage[amountOfImagesInSwapchain];
+			result = vkGetSwapchainImagesKHR(
+			
+				logicalDevice,
+				swapchain,
+				&amountOfImagesInSwapchain,
+				swapchainImages
+			
+			);
+			ASSERT_VULKAN(result);
+
+			imageViews = new VkImageView[amountOfImagesInSwapchain];
+			for (unsigned int i = 0; i < amountOfImagesInSwapchain; i++) {
+
+				// Image view create info
+				VkImageViewCreateInfo imageViewCreateInfo;
+
+				imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+				imageViewCreateInfo.pNext = nullptr;
+				imageViewCreateInfo.flags = 0;
+				imageViewCreateInfo.image = swapchainImages[i];
+				imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+				imageViewCreateInfo.format = VK_FORMAT_B8G8R8A8_UNORM;			// TODO: Check if valid
+				imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+				imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+				imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+				imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+				imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+				imageViewCreateInfo.subresourceRange.levelCount = 1;
+				imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+				imageViewCreateInfo.subresourceRange.layerCount = 1;
+			
+				result = vkCreateImageView(
+				
+					logicalDevice,
+					&imageViewCreateInfo,
+					nullptr,
+					&imageViews[i]
+				
+				);
+				ASSERT_VULKAN(result);
+
+			}
+
+			delete[] swapchainImages;
+
 		}
 
 		/*
@@ -705,6 +779,27 @@ namespace game {
 
 			result = vkDeviceWaitIdle(logicalDevice);
 			ASSERT_VULKAN(result);
+
+			for (unsigned int i = 0; i < amountOfImagesInSwapchain; i++) {
+			
+				vkDestroyImageView(
+				
+					logicalDevice,
+					imageViews[i],
+					nullptr
+				
+				);
+			
+			}
+			delete[] imageViews;
+
+			vkDestroySwapchainKHR(
+				
+				logicalDevice, 
+				swapchain, 
+				nullptr
+			
+			);
 			vkDestroyDevice(logicalDevice, NULL);
 			vkDestroySurfaceKHR(
 
