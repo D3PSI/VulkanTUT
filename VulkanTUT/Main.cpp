@@ -39,20 +39,20 @@ namespace game {
 		void deviceMemoryProperties(VkPhysicalDevice &device);
 		void queueFamilyProperties(VkPhysicalDevice &device);
 		void deviceQueueCreateInfos(VkPhysicalDevice &device);
-		void deviceCreateInfo(VkPhysicalDevice &device);
+		void deviceCreateInfo();
 		void device(void);
 		void createQueue(void);
 		void createSurface(void);
-		void tidyUp(void);
+		void surfaceCapabilities(VkPhysicalDevice &device);
+		void swapchainCreate(void);
+		void shutdownVulkan(void);
 
 	}
 
 	namespace glfw {
 
 		void init(void);
-		void startVulkan(void);
 		void gameLoop(void);
-		void shutdownVulkan(void);
 		void shutdownGLFW(void);
 
 	}
@@ -70,13 +70,17 @@ namespace game {
 	*	Global Variables
 	*
 	*/
-	VkResult result;
+	VkResult									result;
 
-	GLFWwindow* window;
+	GLFWwindow*									window;
 
-	const unsigned int WINDOW_WIDTH = 1280;
-	const unsigned int WINDOW_HEIGHT = 780;
-	const char* TITLE = "D3PSI's first VULKAN engine";
+	VkInstance									instance;
+	VkDevice									logicalDevice;
+	VkSurfaceKHR								surface;
+
+	const unsigned int WINDOW_WIDTH				= 1280;
+	const unsigned int WINDOW_HEIGHT			= 780;
+	const char* TITLE							= "D3PSI's first VULKAN engine";
 
 
 	/*
@@ -94,9 +98,6 @@ namespace game {
 		VkPhysicalDevice*			physicalDevices;
 		VkLayerProperties*			layers;
 		VkExtensionProperties*		extensions;
-		VkInstance					instance;
-		VkDevice					logicalDevice;
-		VkSurfaceKHR				surface;
 
 		/*
 		*	Function:		void vulkan::init()
@@ -128,11 +129,11 @@ namespace game {
 			std::cout << "Amount of instance layers:	" << amountOfLayers << std::endl;
 			for (unsigned int i = 0; i < amountOfLayers; i++) {
 
-				std::cout << "Name:	" << layers[i].layerName << std::endl;
-				std::cout << "Spec-Version:	" << layers[i].specVersion << std::endl;
-				std::cout << "Impl-Version:	" << layers[i].implementationVersion << std::endl;
-				std::cout << "Description:	" << layers[i].description << std::endl;
-				std::cout << "------------------" << std::endl;
+				std::cout << "Name:				" << layers[i].layerName					<< std::endl;
+				std::cout << "Spec-Version:		" << layers[i].specVersion					<< std::endl;
+				std::cout << "Impl-Version:		" << layers[i].implementationVersion		<< std::endl;
+				std::cout << "Description:		" << layers[i].description					<< std::endl;
+				std::cout << "------------------"											<< std::endl;
 
 			}
 
@@ -169,7 +170,7 @@ namespace game {
 			};
 
 			uint32_t amountOfGlfwExtensions = 0;
-			const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&amountOfGlfwExtensions);
+			auto glfwExtensions = glfwGetRequiredInstanceExtensions(&amountOfGlfwExtensions);
 
 			/*const std::vector< const char* > usedExtensions = {
 
@@ -243,9 +244,11 @@ namespace game {
 				deviceMemoryProperties(physicalDevices[i]);
 				queueFamilyProperties(physicalDevices[i]);
 				deviceQueueCreateInfos(physicalDevices[i]);
-				deviceCreateInfo(physicalDevices[i]);
+				surfaceCapabilities(physicalDevices[i]);
 
 			}
+
+			deviceCreateInfo();
 
 		}
 
@@ -266,13 +269,13 @@ namespace game {
 			std::cout << "API-Version:	" << VK_VERSION_MAJOR(apiVer) <<
 				"." << VK_VERSION_MINOR(apiVer) << "." <<
 				VK_VERSION_PATCH(apiVer) << std::endl;
-			std::cout << "Discrete-Queue-Priorities:	" << properties.limits.discreteQueuePriorities << std::endl;
-			std::cout << "Driver-Version:	" << properties.driverVersion << std::endl;
-			std::cout << "Vendor-ID:	" << properties.vendorID << std::endl;
-			std::cout << "Device-ID:	" << properties.deviceID << std::endl;
-			std::cout << "Device-Type:	" << properties.deviceType << std::endl;
-			std::cout << "Pipeline-Cache-UUID:	" << properties.pipelineCacheUUID << std::endl;
-			std::cout << "------------------" << std::endl;
+			std::cout << "Discrete-Queue-Priorities:	" << properties.limits.discreteQueuePriorities		<< std::endl;
+			std::cout << "Driver-Version:				" << properties.driverVersion						<< std::endl;
+			std::cout << "Vendor-ID:					" << properties.vendorID							<< std::endl;
+			std::cout << "Device-ID:					" << properties.deviceID							<< std::endl;
+			std::cout << "Device-Type:					" << properties.deviceType							<< std::endl;
+			std::cout << "Pipeline-Cache-UUID:			" << properties.pipelineCacheUUID					<< std::endl;
+			std::cout << "------------------------------"													<< std::endl;
 
 		}
 
@@ -288,61 +291,61 @@ namespace game {
 			vkGetPhysicalDeviceFeatures(device, &features);
 
 			std::cout << "Features:											"															<< std::endl;
-			std::cout << "Robust Buffer Access:								" << features.robustBufferAccess							<< std::endl;
-			std::cout << "Full Draw Index Uint32:							" << features.fullDrawIndexUint32							<< std::endl;
-			std::cout << "Image Cube Array:									" << features.imageCubeArray								<< std::endl;
-			std::cout << "Independent Blend:								" << features.independentBlend								<< std::endl;
-			std::cout << "Geometry Shader:									" << features.geometryShader								<< std::endl;
-			std::cout << "Tesselation Shader:								" << features.tessellationShader							<< std::endl;
-			std::cout << "Sample Rate Shading:								" << features.sampleRateShading								<< std::endl;
-			std::cout << "Dual Src Blend:									" << features.dualSrcBlend									<< std::endl;
-			std::cout << "Logic Op:											" << features.logicOp										<< std::endl;
-			std::cout << "Multi Draw Indirect:								" << features.multiDrawIndirect								<< std::endl;
-			std::cout << "Draw Indirect First Instance:						" << features.drawIndirectFirstInstance						<< std::endl;
-			std::cout << "Depth Clamp:										" << features.depthClamp									<< std::endl;
-			std::cout << "Depth Bias Clamp:									" << features.depthBiasClamp								<< std::endl;
-			std::cout << "Fill Mode Non Solid:								" << features.fillModeNonSolid								<< std::endl;
-			std::cout << "Depth Bounds:										" << features.depthBounds									<< std::endl;
-			std::cout << "Wide Lines:										" << features.wideLines										<< std::endl;
-			std::cout << "Large Points:										" << features.largePoints									<< std::endl;
-			std::cout << "Alpha To One:										" << features.alphaToOne									<< std::endl;
-			std::cout << "Multi Viewport:									" << features.multiViewport									<< std::endl;
-			std::cout << "Sampler Anisotropy:								" << features.samplerAnisotropy								<< std::endl;
-			std::cout << "Texture Compression ETC2:							" << features.textureCompressionETC2						<< std::endl;
-			std::cout << "Texture Compression ASTC_LDR:						" << features.textureCompressionASTC_LDR					<< std::endl;
-			std::cout << "Texture Compression BC:							" << features.textureCompressionBC							<< std::endl;
-			std::cout << "Occlusion Query Precise:							" << features.occlusionQueryPrecise							<< std::endl;
-			std::cout << "Pipeline Statistics Query:						" << features.pipelineStatisticsQuery						<< std::endl;
-			std::cout << "Vertex Pipeline Stores and Atomics:				" << features.vertexPipelineStoresAndAtomics				<< std::endl;
-			std::cout << "Fragment Stores and Atomics:						" << features.fragmentStoresAndAtomics						<< std::endl;
-			std::cout << "Shader Tessellation and Geometry Point Size:		" << features.shaderTessellationAndGeometryPointSize		<< std::endl;
-			std::cout << "Shader Image Gather Extended:						" << features.shaderImageGatherExtended						<< std::endl;
-			std::cout << "Shader Storage Image Extended Formats:			" << features.shaderStorageImageExtendedFormats				<< std::endl;
-			std::cout << "Shader Storage Image Multisample:					" << features.shaderStorageImageMultisample					<< std::endl;
-			std::cout << "Shader Storage Image Read Without Format:			" << features.shaderStorageImageReadWithoutFormat			<< std::endl;
-			std::cout << "Shader Storage Image Write Without Format:		" << features.shaderStorageImageWriteWithoutFormat			<< std::endl;
-			std::cout << "Shader Uniform Buffer Array Dynamic Indexing:		" << features.shaderUniformBufferArrayDynamicIndexing		<< std::endl;
-			std::cout << "Shader Sampled Image Array Dynamic Indexing:		" << features.shaderSampledImageArrayDynamicIndexing		<< std::endl;
-			std::cout << "Shader Storage Buffer Array Dynamic Indexing:		" << features.shaderStorageBufferArrayDynamicIndexing		<< std::endl;
-			std::cout << "Shader Storage Image Array Dynamic Indexing:		" << features.shaderStorageImageArrayDynamicIndexing		<< std::endl;
-			std::cout << "Shader Clip Distance:								" << features.shaderClipDistance							<< std::endl;
-			std::cout << "Shader Cull Distance:								" << features.shaderCullDistance							<< std::endl;
-			std::cout << "Shader Float64:									" << features.shaderFloat64									<< std::endl;
-			std::cout << "Shader Int64:										" << features.shaderInt64									<< std::endl;
-			std::cout << "Shader Int16:										" << features.shaderInt16									<< std::endl;
-			std::cout << "Shader Resource Residency:						" << features.shaderResourceResidency						<< std::endl;
-			std::cout << "Shader Resource Min Load:							" << features.shaderResourceMinLod							<< std::endl;
-			std::cout << "Sparse Binding:									" << features.sparseBinding									<< std::endl;
-			std::cout << "Sparse Residency Buffer:							" << features.sparseResidencyBuffer							<< std::endl;
-			std::cout << "Sparse Residency Image2D:							" << features.sparseResidencyImage2D						<< std::endl;
-			std::cout << "Sparse Residency Image3D:							" << features.sparseResidencyImage3D						<< std::endl;
-			std::cout << "Sparse Residency 2 Samples:						" << features.sparseResidency2Samples						<< std::endl;
-			std::cout << "Sparse Residency 4 Samples:						" << features.sparseResidency4Samples						<< std::endl;
-			std::cout << "Sparse Residency 8 Samples:						" << features.sparseResidency8Samples						<< std::endl;
-			std::cout << "Sparse Residency 16 Samples:						" << features.sparseResidency16Samples						<< std::endl;
-			std::cout << "Sparse Residency Aliased:							" << features.sparseResidencyAliased						<< std::endl;
-			std::cout << "Variable Multisample Rate:						" << features.variableMultisampleRate						<< std::endl;
-			std::cout << "Inherit Queries:									" << features.inheritedQueries								<< std::endl;
+			std::cout << "\tRobust Buffer Access:								" << features.robustBufferAccess							<< std::endl;
+			std::cout << "\tFull Draw Index Uint32:							" << features.fullDrawIndexUint32							<< std::endl;
+			std::cout << "\tImage Cube Array:									" << features.imageCubeArray								<< std::endl;
+			std::cout << "\tIndependent Blend:								" << features.independentBlend								<< std::endl;
+			std::cout << "\tGeometry Shader:									" << features.geometryShader								<< std::endl;
+			std::cout << "\tTesselation Shader:								" << features.tessellationShader							<< std::endl;
+			std::cout << "\tSample Rate Shading:								" << features.sampleRateShading								<< std::endl;
+			std::cout << "\tDual Src Blend:									" << features.dualSrcBlend									<< std::endl;
+			std::cout << "\tLogic Op:											" << features.logicOp										<< std::endl;
+			std::cout << "\tMulti Draw Indirect:								" << features.multiDrawIndirect								<< std::endl;
+			std::cout << "\tDraw Indirect First Instance:						" << features.drawIndirectFirstInstance						<< std::endl;
+			std::cout << "\tDepth Clamp:										" << features.depthClamp									<< std::endl;
+			std::cout << "\tDepth Bias Clamp:									" << features.depthBiasClamp								<< std::endl;
+			std::cout << "\tFill Mode Non Solid:								" << features.fillModeNonSolid								<< std::endl;
+			std::cout << "\tDepth Bounds:										" << features.depthBounds									<< std::endl;
+			std::cout << "\tWide Lines:										" << features.wideLines										<< std::endl;
+			std::cout << "\tLarge Points:										" << features.largePoints									<< std::endl;
+			std::cout << "\tAlpha To One:										" << features.alphaToOne									<< std::endl;
+			std::cout << "\tMulti Viewport:									" << features.multiViewport									<< std::endl;
+			std::cout << "\tSampler Anisotropy:								" << features.samplerAnisotropy								<< std::endl;
+			std::cout << "\tTexture Compression ETC2:							" << features.textureCompressionETC2						<< std::endl;
+			std::cout << "\tTexture Compression ASTC_LDR:						" << features.textureCompressionASTC_LDR					<< std::endl;
+			std::cout << "\tTexture Compression BC:							" << features.textureCompressionBC							<< std::endl;
+			std::cout << "\tOcclusion Query Precise:							" << features.occlusionQueryPrecise							<< std::endl;
+			std::cout << "\tPipeline Statistics Query:						" << features.pipelineStatisticsQuery						<< std::endl;
+			std::cout << "\tVertex Pipeline Stores and Atomics:				" << features.vertexPipelineStoresAndAtomics				<< std::endl;
+			std::cout << "\tFragment Stores and Atomics:						" << features.fragmentStoresAndAtomics						<< std::endl;
+			std::cout << "\tShader Tessellation and Geometry Point Size:		" << features.shaderTessellationAndGeometryPointSize		<< std::endl;
+			std::cout << "\tShader Image Gather Extended:						" << features.shaderImageGatherExtended						<< std::endl;
+			std::cout << "\tShader Storage Image Extended Formats:			" << features.shaderStorageImageExtendedFormats				<< std::endl;
+			std::cout << "\tShader Storage Image Multisample:					" << features.shaderStorageImageMultisample					<< std::endl;
+			std::cout << "\tShader Storage Image Read Without Format:			" << features.shaderStorageImageReadWithoutFormat			<< std::endl;
+			std::cout << "\tShader Storage Image Write Without Format:		" << features.shaderStorageImageWriteWithoutFormat			<< std::endl;
+			std::cout << "\tShader Uniform Buffer Array Dynamic Indexing:		" << features.shaderUniformBufferArrayDynamicIndexing		<< std::endl;
+			std::cout << "\tShader Sampled Image Array Dynamic Indexing:		" << features.shaderSampledImageArrayDynamicIndexing		<< std::endl;
+			std::cout << "\tShader Storage Buffer Array Dynamic Indexing:		" << features.shaderStorageBufferArrayDynamicIndexing		<< std::endl;
+			std::cout << "\tShader Storage Image Array Dynamic Indexing:		" << features.shaderStorageImageArrayDynamicIndexing		<< std::endl;
+			std::cout << "\tShader Clip Distance:								" << features.shaderClipDistance							<< std::endl;
+			std::cout << "\tShader Cull Distance:								" << features.shaderCullDistance							<< std::endl;
+			std::cout << "\tShader Float64:									" << features.shaderFloat64									<< std::endl;
+			std::cout << "\tShader Int64:										" << features.shaderInt64									<< std::endl;
+			std::cout << "\tShader Int16:										" << features.shaderInt16									<< std::endl;
+			std::cout << "\tShader Resource Residency:						" << features.shaderResourceResidency						<< std::endl;
+			std::cout << "\tShader Resource Min Load:							" << features.shaderResourceMinLod							<< std::endl;
+			std::cout << "\tSparse Binding:									" << features.sparseBinding									<< std::endl;
+			std::cout << "\tSparse Residency Buffer:							" << features.sparseResidencyBuffer							<< std::endl;
+			std::cout << "\tSparse Residency Image2D:							" << features.sparseResidencyImage2D						<< std::endl;
+			std::cout << "\tSparse Residency Image3D:							" << features.sparseResidencyImage3D						<< std::endl;
+			std::cout << "\tSparse Residency 2 Samples:						" << features.sparseResidency2Samples						<< std::endl;
+			std::cout << "\tSparse Residency 4 Samples:						" << features.sparseResidency4Samples						<< std::endl;
+			std::cout << "\tSparse Residency 8 Samples:						" << features.sparseResidency8Samples						<< std::endl;
+			std::cout << "\tSparse Residency 16 Samples:						" << features.sparseResidency16Samples						<< std::endl;
+			std::cout << "\tSparse Residency Aliased:							" << features.sparseResidencyAliased						<< std::endl;
+			std::cout << "\tVariable Multisample Rate:						" << features.variableMultisampleRate						<< std::endl;
+			std::cout << "\tInherit Queries:									" << features.inheritedQueries								<< std::endl;
 			std::cout << "--------------------------------------------------"															<< std::endl;
 
 		}
@@ -379,7 +382,7 @@ namespace game {
 				NULL							// Pass no array to store them, so we can just get the number of queue families
 
 			);
-			VkQueueFamilyProperties *familyProperties = new VkQueueFamilyProperties[amountOfQueueFamilies];
+			VkQueueFamilyProperties* familyProperties = new VkQueueFamilyProperties[amountOfQueueFamilies];
 			vkGetPhysicalDeviceQueueFamilyProperties(
 
 				device,							// Pass the device / GPU
@@ -391,17 +394,17 @@ namespace game {
 
 			for (unsigned int i = 0; i < amountOfQueueFamilies; i++) {
 
-				std::cout << "Queue Family Number:			" << i																			<< std::endl;
-				std::cout << "VK_QUEUE_GRAPHICS_BIT:		" << ((familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)			<< std::endl;
-				std::cout << "VK_QUEUE_COMPUTE_BIT:			" << ((familyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0)				<< std::endl;
-				std::cout << "VK_QUEUE_TRANSFER_BIT:		" << ((familyProperties[i].queueFlags & VK_QUEUE_TRANSFER_BIT) != 0)			<< std::endl;
-				std::cout << "VK_QUEUE_SPARSE_BINDING_BIT:	" << ((familyProperties[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) != 0)		<< std::endl;
-				std::cout << "Queue Count:					" << familyProperties[i].queueCount												<< std::endl;
-				std::cout << "Timestamp Valid Bits:			" << familyProperties[i].timestampValidBits										<< std::endl;
+				std::cout << "Queue Family Number:				" << i																			<< std::endl;
+				std::cout << "\tVK_QUEUE_GRAPHICS_BIT:			" << ((familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)			<< std::endl;
+				std::cout << "\tVK_QUEUE_COMPUTE_BIT:			" << ((familyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0)				<< std::endl;
+				std::cout << "\tVK_QUEUE_TRANSFER_BIT:			" << ((familyProperties[i].queueFlags & VK_QUEUE_TRANSFER_BIT) != 0)			<< std::endl;
+				std::cout << "\tVK_QUEUE_SPARSE_BINDING_BIT:	" << ((familyProperties[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) != 0)		<< std::endl;
+				std::cout << "\tQueue Count:					" << familyProperties[i].queueCount												<< std::endl;
+				std::cout << "\tTimestamp Valid Bits:			" << familyProperties[i].timestampValidBits										<< std::endl;
 
-				uint32_t width = familyProperties[i].minImageTransferGranularity.width;
-				uint32_t height = familyProperties[i].minImageTransferGranularity.height;
-				uint32_t depth = familyProperties[i].minImageTransferGranularity.depth;
+				uint32_t width		= familyProperties[i].minImageTransferGranularity.width;
+				uint32_t height		= familyProperties[i].minImageTransferGranularity.height;
+				uint32_t depth		= familyProperties[i].minImageTransferGranularity.depth;
 				std::cout << "Min Image Timestamp Granularity:	" << width << "," << height << "," << depth									<< std::endl;
 
 			}
@@ -417,10 +420,17 @@ namespace game {
 		*/
 		// Device queue create info
 		VkDeviceQueueCreateInfo deviceQueueCreateInfo;
-		float queuePriorities[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+		float queuePriorities[] = { 
+			
+			1.0f,
+			1.0f,
+			1.0f,
+			1.0f
+		
+		};
 		void deviceQueueCreateInfos(VkPhysicalDevice &device) {
 
-			deviceQueueCreateInfo.sType					= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+			deviceQueueCreateInfo.sType					= VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 			deviceQueueCreateInfo.pNext					= NULL;
 			deviceQueueCreateInfo.flags					= 0;
 			deviceQueueCreateInfo.queueFamilyIndex		= 0;		// TODO: Enumerate best queue family and choose the correct index
@@ -434,11 +444,23 @@ namespace game {
 		*	Purpose:		Prints the device creation info
 		*
 		*/
-		// Physical device features
-		VkPhysicalDeviceFeatures usedFeatures = {};
+		
 		// Device create info
 		VkDeviceCreateInfo createInfo;
-		void deviceCreateInfo(VkPhysicalDevice &device) {
+		void deviceCreateInfo() {
+
+			// Physical device features
+			VkPhysicalDeviceFeatures usedFeatures = {
+
+
+
+			};
+
+			const std::vector< const char* > deviceExtensions = {
+			
+				VK_KHR_SWAPCHAIN_EXTENSION_NAME
+			
+			};
 
 			createInfo.sType						= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 			createInfo.pNext						= NULL;
@@ -447,10 +469,12 @@ namespace game {
 			createInfo.pQueueCreateInfos			= &deviceQueueCreateInfo;
 			createInfo.enabledLayerCount			= 0;
 			createInfo.ppEnabledLayerNames			= NULL;
-			createInfo.enabledExtensionCount		= 0;
-			createInfo.ppEnabledExtensionNames		= NULL;
+			createInfo.enabledExtensionCount		= deviceExtensions.size();
+			createInfo.ppEnabledExtensionNames		= deviceExtensions.data();
 			createInfo.pEnabledFeatures				= &usedFeatures;
-
+			
+			device();
+			
 		}
 
 		/*
@@ -475,9 +499,6 @@ namespace game {
 
 			createQueue();
 
-			tidyUp();
-			logger.log(EVENT_LOG, "Cleaned up successfully");
-
 		}
 
 		/*
@@ -497,6 +518,18 @@ namespace game {
 				&queue
 			
 			);
+
+			VkBool32 surfaceSupport = false;
+
+			result = vkGetPhysicalDeviceSurfaceSupportKHR(
+				
+				physicalDevices[0], 
+				0, 
+				surface,
+				&surfaceSupport
+			
+			);
+			ASSERT_VULKAN(result);
 
 		}
 
@@ -531,25 +564,159 @@ namespace game {
 		}
 
 		/*
-		*	Function:		void vulkan::tidyUp()
-		*	Purpose:		Cleans the code, deletes unneeded objects and memory
+		*	Function:		void vulkan::surfaceCapabilities()
+		*	Purpose:		Get stats of surface
 		*
 		*/
-		void tidyUp() {
-
-			vkDeviceWaitIdle(logicalDevice); 
-			vkDestroyDevice(logicalDevice, NULL);
-			vkDestroySurfaceKHR(
-				
-				instance, 
-				surface, 
-				NULL
+		// Surface Capabilities
+		VkSurfaceCapabilitiesKHR surfaceCapabs;
+		void surfaceCapabilities(VkPhysicalDevice &device) {
+		
+			result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+			
+				device,
+				surface,
+				&surfaceCapabs
 			
 			);
+			ASSERT_VULKAN(result);
+
+			std::cout << "Surface capabilities:	"														<< std::endl;
+			std::cout << "\tminImageCount: "			<< surfaceCapabs.minImageCount					<< std::endl;
+			std::cout << "\tmaxImageCount: "			<< surfaceCapabs.maxImageCount					<< std::endl;
+			std::cout << "\tcurrentExtent: "			<< surfaceCapabs.currentExtent.width			<< " / " 
+														<< surfaceCapabs.currentExtent.height			<< std::endl;
+			std::cout << "\tminImageExtent: "			<< surfaceCapabs.minImageExtent.width			<< " / " 
+														<< surfaceCapabs.minImageExtent.height			<< std::endl;
+			std::cout << "\tmaxImageExtent: "			<< surfaceCapabs.maxImageExtent.width			<< " / " 
+														<< surfaceCapabs.maxImageExtent.height			<< std::endl;
+			std::cout << "\tmaxImageArrayLayers: "		<< surfaceCapabs.maxImageArrayLayers			<< std::endl;
+			std::cout << "\tsupportedTransforms: "		<< surfaceCapabs.supportedTransforms			<< std::endl;
+			std::cout << "\tcurrentTransform: "			<< surfaceCapabs.currentTransform				<< std::endl;
+			std::cout << "\tsupportedCompositeAlpha: "	<< surfaceCapabs.supportedCompositeAlpha		<< std::endl;
+			std::cout << "\tsupportedUsageFlags: "		<< surfaceCapabs.supportedUsageFlags			<< std::endl;
+		
+			uint32_t amountOfFormats = 0;
+			result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+				
+				device,
+				surface,
+				&amountOfFormats,
+				nullptr
+			
+			);
+			ASSERT_VULKAN(result);
+
+			VkSurfaceFormatKHR* surfaceFormats = new VkSurfaceFormatKHR[amountOfFormats];
+			result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+			
+				device,
+				surface,
+				&amountOfFormats,
+				surfaceFormats
+						
+			);
+			ASSERT_VULKAN(result);
+
+			std::cout << "-------------------------------" << std::endl;
+			std::cout << "Amount of Formats:	" << amountOfFormats << std::endl;
+			for (unsigned int i = 0; i < amountOfFormats; i++) {
+			
+				std::cout << "Format:	" << surfaceFormats[i].format << std::endl;
+			
+			}
+
+			uint32_t amountOfPresentationModes = 0;
+			vkGetPhysicalDeviceSurfacePresentModesKHR(
+			
+				device,
+				surface,
+				&amountOfPresentationModes,
+				nullptr
+
+			);
+
+			VkPresentModeKHR* presentModes = new VkPresentModeKHR[amountOfPresentationModes];
+			vkGetPhysicalDeviceSurfacePresentModesKHR(
+
+				device,
+				surface,
+				&amountOfPresentationModes,
+				presentModes
+
+			);
+
+			std::cout << "Amount of Presentation Modes:	" << amountOfPresentationModes << std::endl;
+			for (unsigned int i = 0; i < amountOfPresentationModes; i++) {
+			
+				std::cout << "\tSupported Presentation Mode: " << presentModes[i] << std::endl;
+			
+			}
+
+			delete[] surfaceFormats;
+
+		}
+
+		/*
+		*	Function:		void vulkan::swapchain()
+		*	Purpose:		Creates the swapchain
+		*
+		*/
+		// SwapchainCreateInfo
+		VkSwapchainCreateInfoKHR swapchainCreateInfo;
+		// Swapchain
+		VkSwapchainKHR swapchain;
+		void swapchainCreate() {
+		
+			swapchainCreateInfo.sType						= VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+			swapchainCreateInfo.pNext						= nullptr;
+			swapchainCreateInfo.flags						= 0;
+			swapchainCreateInfo.surface						= surface;
+			swapchainCreateInfo.minImageCount				= 3;									// TODO: Check if valid
+			swapchainCreateInfo.imageFormat					= VK_FORMAT_B8G8R8A8_UNORM;				// TODO: Check if valid
+			swapchainCreateInfo.imageColorSpace				= VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;	// TODO: Check if valid
+			swapchainCreateInfo.imageExtent					= VkExtent2D {
+
+																WINDOW_WIDTH, 
+																WINDOW_HEIGHT
+
+															};
+			swapchainCreateInfo.imageArrayLayers			= 1;
+			swapchainCreateInfo.imageUsage					= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+			swapchainCreateInfo.imageSharingMode			= VK_SHARING_MODE_EXCLUSIVE;			// TODO: Check if valid
+			swapchainCreateInfo.queueFamilyIndexCount		= 0;
+			swapchainCreateInfo.pQueueFamilyIndices			= nullptr;
+			swapchainCreateInfo.preTransform				= VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+			swapchainCreateInfo.compositeAlpha				= VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+			swapchainCreateInfo.presentMode					= VK_PRESENT_MODE_FIFO_KHR;			// TODO: Check if valid, VK_PRESENT_MODE_MAILBOX_KHR?
+			swapchainCreateInfo.clipped						= VK_TRUE;
+			swapchainCreateInfo.oldSwapchain				= VK_NULL_HANDLE;
+		
+		}
+
+		/*
+		*	Function:		void vulkan::shutdownVulkan()
+		*	Purpose:		Handles main shutdown of the VULKAN API
+		*
+		*/
+		void shutdownVulkan() {
+
+			vulkan::logger.log(START_STOP_LOG, "Shutdown initialized...");
+
+			result = vkDeviceWaitIdle(logicalDevice);
+			ASSERT_VULKAN(result);
+			vkDestroyDevice(logicalDevice, NULL);
+			vkDestroySurfaceKHR(
+
+				instance,
+				surface,
+				NULL
+
+			);
 			vkDestroyInstance(instance, NULL);
-			delete[] layers;
-			delete[] extensions;
-			delete[] physicalDevices;
+			delete[] vulkan::layers;
+			delete[] vulkan::extensions;
+			delete[] vulkan::physicalDevices;
 
 		}
 
@@ -586,17 +753,6 @@ namespace game {
 		}
 
 		/*
-		*	Function:		void glfw::startVulkan()
-		*	Purpose:		Initiates VULKAN startup
-		*
-		*/
-		void startVulkan() {
-
-			game::vulkan::init();
-
-		}
-
-		/*
 		*	Function:		void glfw::gameLoop()
 		*	Purpose:		Contains the main game loop
 		*
@@ -608,18 +764,6 @@ namespace game {
 				glfwPollEvents();
 
 			}
-
-		}
-
-		/*
-		*	Function:		void glfw::shutdownVulkan()
-		*	Purpose:		Handles main shutdown of the VULKAN API
-		*
-		*/
-		void shutdownVulkan() {
-
-			vulkan::logger.log(START_STOP_LOG, "Shutdown initialized...");
-			//vulkan::tidyUp();
 
 		}
 
@@ -645,9 +789,10 @@ namespace game {
 int main() {
 
 	game::glfw::init();
-	game::glfw::startVulkan();
+	game::vulkan::init();
+
 	game::glfw::gameLoop();
-	game::glfw::shutdownVulkan();
+	game::vulkan::shutdownVulkan();
 	game::glfw::shutdownGLFW();
 
 	return 0;
