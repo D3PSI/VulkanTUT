@@ -26,6 +26,13 @@
 	}
 
 /*
+*	Typedefs
+*
+*
+*/
+typedef std::vector< char >	Shader;
+
+/*
 *	Prototypes
 *
 */
@@ -46,6 +53,7 @@ namespace game {
 		void surfaceCapabilities(VkPhysicalDevice &device);
 		void swapchainCreate(void);
 		void shutdownVulkan(void);
+		Shader readFile(const std::string &filename);
 
 	}
 
@@ -253,6 +261,7 @@ namespace game {
 			}
 
 			deviceCreateInfo();
+			swapchainCreate();
 
 		}
 
@@ -665,6 +674,7 @@ namespace game {
 			}
 
 			delete[] surfaceFormats;
+			delete[] presentModes;
 
 		}
 
@@ -764,7 +774,40 @@ namespace game {
 
 			}
 
+			Shader shaderCodeVert	= readFile("vert.spv");
+			Shader shaderCodeFrag	= readFile("frag.spv");
+
 			delete[] swapchainImages;
+			delete[] layers;
+			delete[] extensions;
+
+		}
+
+		/*
+		*	Function:		std::vector< char > readFile(const std::string &filename)
+		*	Purpose:		Reads files and loads them to HEAP
+		*
+		*/
+		Shader readFile(const std::string &filename) {
+		
+			std::ifstream file(filename, std::ios::binary | std::ios::ate);
+		
+			if (file) {
+			
+				size_t filesize = static_cast<size_t>(file.tellg());
+				Shader fileBuffer(filesize);
+				file.seekg(0);
+				file.read(fileBuffer.data(), filesize);
+				file.close();
+				return fileBuffer;
+			
+			}
+			else {
+			
+				logger.log(ERROR_LOG, "Failed to open shader-file at " + filename);
+				throw std::runtime_error("Failed to open shader-file at " + filename);
+			
+			}
 
 		}
 
@@ -809,8 +852,6 @@ namespace game {
 
 			);
 			vkDestroyInstance(instance, NULL);
-			delete[] vulkan::layers;
-			delete[] vulkan::extensions;
 			delete[] vulkan::physicalDevices;
 
 		}
@@ -874,6 +915,7 @@ namespace game {
 		}
 
 	}
+
 }
 
 /*
