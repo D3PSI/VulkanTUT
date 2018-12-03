@@ -26,13 +26,6 @@
 	}
 
 /*
-*	Typedefs
-*
-*
-*/
-typedef std::vector< char >	Shader;
-
-/*
 *	Prototypes
 *
 */
@@ -52,8 +45,9 @@ namespace game {
 		void createSurface(void);
 		void surfaceCapabilities(VkPhysicalDevice &device);
 		void swapchainCreate(void);
-		void shutdownVulkan(void);
-		Shader readFile(const std::string &filename);
+		void shutdownVulkan(void);		
+		void createShaderModule(const std::vector< char >& code, VkShaderModule* shaderModule);
+		std::vector< char > readFile(const std::string &filename);
 
 	}
 
@@ -110,6 +104,9 @@ namespace game {
 		VkExtensionProperties*						extensions;
 
 		uint32_t amountOfImagesInSwapchain			= 0;
+			   
+		VkShaderModule shaderModuleVert;
+		VkShaderModule shaderModuleFrag;
 
 		/*
 		*	Function:		void vulkan::init()
@@ -774,8 +771,11 @@ namespace game {
 
 			}
 
-			Shader shaderCodeVert	= readFile("vert.spv");
-			Shader shaderCodeFrag	= readFile("frag.spv");
+			std::vector< char > shaderCodeVert = readFile("vert.spv");
+			std::vector< char > shaderCodeFrag = readFile("frag.spv");
+
+			createShaderModule(shaderCodeVert, &shaderModuleVert);
+			createShaderModule(shaderCodeFrag, &shaderModuleFrag);
 
 			delete[] swapchainImages;
 			delete[] layers;
@@ -784,18 +784,44 @@ namespace game {
 		}
 
 		/*
-		*	Function:		std::vector< char > readFile(const std::string &filename)
+		*	Function:		void vulkan::createShaderModule(const std::vector< char >& code, VkShaderModule* shaderModule)
+		*	Purpose:		Creates a shader module
+		*
+		*/
+		void createShaderModule(const std::vector< char >& code, VkShaderModule* shaderModule) {
+
+			VkShaderModuleCreateInfo shaderCreateInfo;
+			shaderCreateInfo.sType			= VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			shaderCreateInfo.pNext			= nullptr;
+			shaderCreateInfo.flags			= 0;
+			shaderCreateInfo.codeSize		= code.size();
+			shaderCreateInfo.pCode			= (uint32_t*)code.data();
+
+			result = vkCreateShaderModule(
+			
+				logicalDevice,
+				&shaderCreateInfo,
+				nullptr,
+				shaderModule
+			
+			);
+			ASSERT_VULKAN(result);
+		
+		}
+
+		/*
+		*	Function:		std::vector< char > vulkan::readFile(const std::string &filename)
 		*	Purpose:		Reads files and loads them to HEAP
 		*
 		*/
-		Shader readFile(const std::string &filename) {
+		std::vector< char > readFile(const std::string &filename) {
 		
 			std::ifstream file(filename, std::ios::binary | std::ios::ate);
 		
 			if (file) {
 			
-				size_t filesize = static_cast<size_t>(file.tellg());
-				Shader fileBuffer(filesize);
+				size_t filesize = static_cast< size_t >(file.tellg());
+				std::vector< char > fileBuffer(filesize);
 				file.seekg(0);
 				file.read(fileBuffer.data(), filesize);
 				file.close();
@@ -835,6 +861,21 @@ namespace game {
 			
 			}
 			delete[] imageViews;
+
+			vkDestroyShaderModule(
+				
+				logicalDevice, 
+				shaderModuleVert,
+				nullptr
+			
+			); 
+			vkDestroyShaderModule(
+
+				logicalDevice,
+				shaderModuleFrag,
+				nullptr
+
+			);
 
 			vkDestroySwapchainKHR(
 				
@@ -927,7 +968,6 @@ int main() {
 
 	game::glfw::init();
 	game::vulkan::init();
-
 	game::glfw::gameLoop();
 	game::vulkan::shutdownVulkan();
 	game::glfw::shutdownGLFW();
