@@ -46,6 +46,7 @@ namespace game {
 		void surfaceCapabilities(VkPhysicalDevice &device);
 		void swapchainCreate(void);
 		void shutdownVulkan(void);		
+		void drawFrame();
 		void createShaderModule(const std::vector< char >& code, VkShaderModule* shaderModule);
 		std::vector< char > readFile(const std::string &filename);
 
@@ -81,9 +82,15 @@ namespace game {
 	VkSurfaceKHR									surface;
 	VkSwapchainKHR									swapchain;
 	VkImageView*									imageViews;
+	VkFramebuffer*									framebuffers;
+	VkCommandPool									commandPool;
+	VkQueue											queue;
+	VkCommandBuffer*								commandBuffers;
 	VkPipelineLayout								pipelineLayout;
 	VkPipeline										pipeline;
 	VkRenderPass									renderPass;
+	VkSemaphore										semaphoreImageAvailable;
+	VkSemaphore										semaphoreRenderingFinished;
 	VkViewport										viewport;
 
 	const unsigned int WINDOW_WIDTH					= 1280;
@@ -521,8 +528,6 @@ namespace game {
 		*	Purpose:		Creates the queue for the logical device
 		*
 		*/
-		// Queue
-		VkQueue queue;
 		void createQueue() {
 
 			vkGetDeviceQueue(
@@ -948,6 +953,15 @@ namespace game {
 			subpassDescription.preserveAttachmentCount		= 0;
 			subpassDescription.pPreserveAttachments			= nullptr;
 
+			VkSubpassDependency subpassDependency;
+			subpassDependency.srcSubpass			= VK_SUBPASS_EXTERNAL;
+			subpassDependency.dstSubpass			= 0;
+			subpassDependency.srcStageMask			= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			subpassDependency.dstStageMask			= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			subpassDependency.srcAccessMask			= 0;
+			subpassDependency.dstAccessMask			= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			subpassDependency.dependencyFlags		= 0;
+
 			VkRenderPassCreateInfo renderPassCreateInfo;
 			renderPassCreateInfo.sType					= VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 			renderPassCreateInfo.pNext					= nullptr;
@@ -957,7 +971,7 @@ namespace game {
 			renderPassCreateInfo.subpassCount			= 1;
 			renderPassCreateInfo.pSubpasses				= &subpassDescription;
 			renderPassCreateInfo.dependencyCount		= 0;
-			renderPassCreateInfo.pDependencies			= nullptr;
+			renderPassCreateInfo.pDependencies			= &subpassDependency;
 
 			result = vkCreateRenderPass(
 			
@@ -1001,6 +1015,145 @@ namespace game {
 
 			);
 			ASSERT_VULKAN(result);
+
+			framebuffers = new VkFramebuffer[amountOfImagesInSwapchain];
+			for (size_t i = 0; i < amountOfImagesInSwapchain; i++) {
+			
+				VkFramebufferCreateInfo frambufferCreateInfo;
+				frambufferCreateInfo.sType				= VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				frambufferCreateInfo.pNext				= nullptr;
+				frambufferCreateInfo.flags				= 0;
+				frambufferCreateInfo.renderPass			= renderPass;
+				frambufferCreateInfo.attachmentCount	= 1;
+				frambufferCreateInfo.pAttachments		= &(imageViews[i]);
+				frambufferCreateInfo.width				= WINDOW_WIDTH;
+				frambufferCreateInfo.height				= WINDOW_HEIGHT;
+				frambufferCreateInfo.layers				= 1;
+
+				result = vkCreateFramebuffer(
+					
+					logicalDevice, 
+					&frambufferCreateInfo,
+					nullptr, 
+					&(framebuffers[i])
+				
+				);
+				ASSERT_VULKAN(result);
+
+			}
+
+			VkCommandPoolCreateInfo commandPoolCreateInfo;
+			commandPoolCreateInfo.sType					= VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+			commandPoolCreateInfo.pNext					= nullptr;
+			commandPoolCreateInfo.flags					= 0;
+			commandPoolCreateInfo.queueFamilyIndex		= 0;		// TODO: Check if valid
+
+			result = vkCreateCommandPool(
+			
+				logicalDevice,
+				&commandPoolCreateInfo,
+				nullptr,
+				&commandPool
+			
+			);
+			ASSERT_VULKAN(result);
+
+			VkCommandBufferAllocateInfo commandBufferAllocateInfo;
+			commandBufferAllocateInfo.sType					= VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			commandBufferAllocateInfo.pNext					= nullptr;
+			commandBufferAllocateInfo.commandPool			= commandPool;
+			commandBufferAllocateInfo.level					= VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			commandBufferAllocateInfo.commandBufferCount	= amountOfImagesInSwapchain;
+
+			commandBuffers = new VkCommandBuffer[amountOfImagesInSwapchain];
+			result = vkAllocateCommandBuffers(
+				
+				logicalDevice,
+				&commandBufferAllocateInfo,
+				commandBuffers
+			
+			);
+			ASSERT_VULKAN(result);
+
+			VkCommandBufferBeginInfo commandBufferBeginInfo;
+			commandBufferBeginInfo.sType				= VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			commandBufferBeginInfo.pNext				= nullptr;
+			commandBufferBeginInfo.flags				= VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+			commandBufferBeginInfo.pInheritanceInfo		= nullptr;
+
+			for (size_t i = 0; i < amountOfImagesInSwapchain; i++) {
+			
+				result = vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo);
+				ASSERT_VULKAN(result);
+
+				VkRenderPassBeginInfo renderPassBeginInfo;
+				renderPassBeginInfo.sType					= VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				renderPassBeginInfo.pNext					= nullptr;
+				renderPassBeginInfo.renderPass				= renderPass;
+				renderPassBeginInfo.framebuffer				= framebuffers[i];
+				renderPassBeginInfo.renderArea.offset		= { 0, 0 };
+				renderPassBeginInfo.renderArea.extent		= { WINDOW_WIDTH, WINDOW_HEIGHT };
+				VkClearValue clearValue						= { 0.0f, 0.0f, 0.0f, 1.0f };
+				renderPassBeginInfo.clearValueCount			= 1;
+				renderPassBeginInfo.pClearValues			= &clearValue;
+
+				vkCmdBeginRenderPass(
+				
+					commandBuffers[i], 
+					&renderPassBeginInfo,
+					VK_SUBPASS_CONTENTS_INLINE
+				
+				);
+
+				vkCmdBindPipeline(
+					
+					commandBuffers[i],
+					VK_PIPELINE_BIND_POINT_GRAPHICS, 
+					pipeline
+				
+				);
+
+				vkCmdDraw(
+					
+					commandBuffers[i], 
+					3, 
+					1,
+					0, 
+					0
+				
+				);
+
+				vkCmdEndRenderPass(commandBuffers[i]);
+
+				result = vkEndCommandBuffer(commandBuffers[i]);
+				ASSERT_VULKAN(result);
+			
+			}
+
+			VkSemaphoreCreateInfo semaphoreCreateInfo;
+			semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+			semaphoreCreateInfo.pNext = nullptr;
+			semaphoreCreateInfo.flags = 0;
+
+			result = vkCreateSemaphore(
+				
+				logicalDevice, 
+				&semaphoreCreateInfo, 
+				nullptr, 
+				&semaphoreImageAvailable
+			
+			);
+			ASSERT_VULKAN(result);
+			result = vkCreateSemaphore(
+				
+				logicalDevice, 
+				&semaphoreCreateInfo,
+				nullptr, 
+				&semaphoreRenderingFinished
+			
+			);
+			ASSERT_VULKAN(result);
+
 
 			delete[] swapchainImages;
 			delete[] layers;
@@ -1073,6 +1226,38 @@ namespace game {
 
 			result = vkDeviceWaitIdle(logicalDevice);
 			ASSERT_VULKAN(result);
+
+			vkDestroySemaphore(logicalDevice, semaphoreImageAvailable, nullptr);
+			vkDestroySemaphore(logicalDevice, semaphoreRenderingFinished, nullptr);
+
+			vkFreeCommandBuffers(
+				
+				logicalDevice,
+				commandPool, 
+				amountOfImagesInSwapchain,
+				commandBuffers
+
+			);
+			delete[] commandBuffers;
+
+			vkDestroyCommandPool(
+				
+				logicalDevice,
+				commandPool, 
+				nullptr);
+
+			for (size_t i = 0; i < amountOfImagesInSwapchain; i++) {
+			
+				vkDestroyFramebuffer(
+				
+					logicalDevice,
+					framebuffers[i],
+					nullptr
+				
+				);
+			
+			}
+			delete[] framebuffers;
 
 			vkDestroyPipeline(
 
@@ -1147,6 +1332,67 @@ namespace game {
 
 		}
 
+		/*
+		*	Function:		vulkan::drawFrame()
+		*	Purpose:		Renders a frame to the screen
+		*
+		*/
+		void drawFrame() {
+		
+			uint32_t imageIndex;
+			vkAcquireNextImageKHR(
+			
+				logicalDevice,
+				swapchain,
+				(size_t)(std::numeric_limits< uint64_t >::max),
+				semaphoreImageAvailable,
+				VK_NULL_HANDLE,
+				&imageIndex
+			
+			);
+
+			VkSubmitInfo submitInfo;
+			submitInfo.sType						= VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.pNext						= nullptr;
+			submitInfo.waitSemaphoreCount			= 1;
+			submitInfo.pWaitSemaphores				= &semaphoreImageAvailable;
+			VkPipelineStageFlags waitStageMask[]	= { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+			submitInfo.pWaitDstStageMask			= waitStageMask;
+			submitInfo.commandBufferCount			= 1;
+			submitInfo.pCommandBuffers				= &(commandBuffers[imageIndex]);
+			submitInfo.signalSemaphoreCount			= 1;
+			submitInfo.pSignalSemaphores			= &semaphoreRenderingFinished;
+
+			result = vkQueueSubmit(
+			
+				queue, 
+				1,
+				&submitInfo, 
+				VK_NULL_HANDLE
+			
+			);
+			ASSERT_VULKAN(result);
+
+			VkPresentInfoKHR presentInfo;
+			presentInfo.sType					= VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+			presentInfo.pNext					= nullptr;
+			presentInfo.waitSemaphoreCount		= 1;
+			presentInfo.pWaitSemaphores			= &semaphoreRenderingFinished;
+			presentInfo.swapchainCount			= 1;
+			presentInfo.pSwapchains				= &swapchain;
+			presentInfo.pImageIndices			= &imageIndex;
+			presentInfo.pResults				= nullptr;
+
+			result = vkQueuePresentKHR(
+			
+				queue,
+				&presentInfo
+			
+			);
+			ASSERT_VULKAN(result);
+
+		}
+
 	}
 
 	/*
@@ -1189,6 +1435,7 @@ namespace game {
 			while (!glfwWindowShouldClose(window)) {
 
 				glfwPollEvents();
+				vulkan::drawFrame();
 
 			}
 
